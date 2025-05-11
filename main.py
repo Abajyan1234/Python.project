@@ -18,6 +18,7 @@ settings = game_data.get_settings()
 # Game window setup
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Space Shooter")
 clock = pygame.time.Clock()
 FPS = 60  # Frames per second
 
@@ -229,12 +230,6 @@ enemies = pygame.sprite.Group()
 powerups = pygame.sprite.Group()
 enemy_bullets = pygame.sprite.Group()
 
-# Spawn initial enemies
-for _ in range(6):
-    e = Enemy()
-    all_sprites.add(e)
-    enemies.add(e)
-
 # Load high score from file
 record_path = "record.txt"
 if os.path.exists(record_path):
@@ -251,39 +246,118 @@ font = pygame.font.Font(None, 36)
 start_time = time.time()
 kills = 0
 
-def show_game_over_screen(screen, score, level, game_data):
+def show_start_screen(screen, game_data):
     screen.fill((0, 0, 30))  # Dark background
     
     # Load fonts
     title_font = pygame.font.Font(None, 74)
     text_font = pygame.font.Font(None, 36)
     
-    # Game Over text
-    game_over_text = title_font.render("GAME OVER", True, RED)
-    screen.blit(game_over_text, (WIDTH//2 - game_over_text.get_width()//2, 50))
+    # Game Title
+    title_text = title_font.render("SPACE SHOOTER", True, CYAN)
+    screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, 100))
     
-    # Final score
-    score_text = text_font.render(f"Final Score: {score}", True, WHITE)
+    # High Scores
+    high_scores = game_data.get_high_scores()
+    high_score_text = text_font.render("High Scores:", True, WHITE)
+    screen.blit(high_score_text, (WIDTH//2 - high_score_text.get_width()//2, 200))
+    
+    for i, score_data in enumerate(high_scores[:3]):  # Show top 3 scores
+        score_line = text_font.render(
+            f"{i+1}. {score_data['score']} (Level {score_data['level']})", 
+            True, 
+            WHITE
+        )
+        screen.blit(score_line, (WIDTH//2 - score_line.get_width()//2, 250 + i*30))
+    
+    # Controls
+    controls = [
+        "Controls:",
+        "Arrow Keys - Move",
+        "Space - Shoot",
+        "Collect Power-ups:",
+        "Purple - Multi Shot",
+        "Orange - Speed Boost",
+        "Cyan - Shield"
+    ]
+    
+    for i, text in enumerate(controls):
+        control_text = text_font.render(text, True, WHITE)
+        screen.blit(control_text, (WIDTH//2 - control_text.get_width()//2, 350 + i*30))
+    
+    # Start instructions
+    start_text = text_font.render("Press SPACE to Start", True, WHITE)
+    screen.blit(start_text, (WIDTH//2 - start_text.get_width()//2, HEIGHT - 100))
+    
+    # Version
+    version_text = text_font.render("v1.0", True, WHITE)
+    screen.blit(version_text, (WIDTH - 60, HEIGHT - 30))
+    
+    pygame.display.flip()
+    
+    # Wait for player input
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    return True
+                if event.key == pygame.K_ESCAPE:
+                    return False
+    return False
+
+def show_game_over_screen(screen, score, level, game_data):
+    # Create a semi-transparent overlay
+    overlay = pygame.Surface((WIDTH, HEIGHT))
+    overlay.fill((0, 0, 0))
+    overlay.set_alpha(128)
+    screen.blit(overlay, (0, 0))
+    
+    # Load fonts
+    title_font = pygame.font.Font(None, 74)
+    text_font = pygame.font.Font(None, 36)
+    small_font = pygame.font.Font(None, 24)
+    
+    # Game Over text with animation
+    game_over_text = title_font.render("GAME OVER", True, RED)
+    text_rect = game_over_text.get_rect(center=(WIDTH//2, 50))
+    
+    # Animate the text
+    for i in range(10):
+        screen.blit(overlay, (0, 0))  # Refresh overlay
+        offset = math.sin(i * 0.5) * 5  # Oscillating offset
+        screen.blit(game_over_text, (text_rect.x, text_rect.y + offset))
+        pygame.display.flip()
+        pygame.time.delay(50)
+    
+    # Final score with larger font
+    score_font = pygame.font.Font(None, 48)
+    score_text = score_font.render(f"Final Score: {score}", True, WHITE)
     screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, 150))
     
     # Level reached
     level_text = text_font.render(f"Level Reached: {level}", True, WHITE)
     screen.blit(level_text, (WIDTH//2 - level_text.get_width()//2, 200))
     
-    # High Scores
-    high_scores = game_data.get_high_scores()
+    # High Scores with decorative line
+    pygame.draw.line(screen, WHITE, (WIDTH//4, 250), (3*WIDTH//4, 250), 2)
     high_score_text = text_font.render("High Scores:", True, WHITE)
-    screen.blit(high_score_text, (WIDTH//2 - high_score_text.get_width()//2, 250))
+    screen.blit(high_score_text, (WIDTH//2 - high_score_text.get_width()//2, 270))
     
+    high_scores = game_data.get_high_scores()
     for i, score_data in enumerate(high_scores[:5]):  # Show top 5 scores
+        # Highlight current score if it's in top 5
+        color = CYAN if score_data['score'] == score else WHITE
         score_line = text_font.render(
             f"{i+1}. {score_data['score']} (Level {score_data['level']}) - {score_data['date']}", 
             True, 
-            WHITE
+            color
         )
-        screen.blit(score_line, (WIDTH//2 - score_line.get_width()//2, 300 + i*30))
+        screen.blit(score_line, (WIDTH//2 - score_line.get_width()//2, 320 + i*30))
     
-    # Stats
+    # Stats with icons
     stats = game_data.get_stats()
     stats_text = text_font.render("Game Statistics:", True, WHITE)
     screen.blit(stats_text, (WIDTH//2 - stats_text.get_width()//2, 500))
@@ -295,16 +369,39 @@ def show_game_over_screen(screen, score, level, game_data):
     seconds = int(play_time % 60)
     time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     
-    time_text = text_font.render(f"Total Play Time: {time_str}", True, WHITE)
-    screen.blit(time_text, (WIDTH//2 - time_text.get_width()//2, 530))
+    # Draw stats with decorative elements
+    pygame.draw.line(screen, WHITE, (WIDTH//4, 530), (3*WIDTH//4, 530), 1)
+    time_text = text_font.render(f"⏱️  Total Play Time: {time_str}", True, WHITE)
+    screen.blit(time_text, (WIDTH//2 - time_text.get_width()//2, 540))
     
-    kills_text = text_font.render(f"Total Kills: {stats['total_kills']}", True, WHITE)
-    screen.blit(kills_text, (WIDTH//2 - kills_text.get_width()//2, 560))
+    kills_text = text_font.render(f"💀 Total Kills: {stats['total_kills']}", True, WHITE)
+    screen.blit(kills_text, (WIDTH//2 - kills_text.get_width()//2, 580))
     
-    # Restart instructions
+    # Power-up stats
+    powerup_text = text_font.render("Power-ups Collected:", True, WHITE)
+    screen.blit(powerup_text, (WIDTH//2 - powerup_text.get_width()//2, 620))
+    
+    y_offset = 650
+    for powerup, count in stats['powerups_collected'].items():
+        color = PURPLE if powerup == 'MULTI_SHOT' else ORANGE if powerup == 'SPEED_BOOST' else CYAN
+        powerup_stat = small_font.render(f"{powerup}: {count}", True, color)
+        screen.blit(powerup_stat, (WIDTH//2 - powerup_stat.get_width()//2, y_offset))
+        y_offset += 25
+    
+    # Restart instructions with animation
+    for i in range(3):  # Blink the text 3 times
+        restart_text = text_font.render("Press SPACE to restart or ESC to quit", True, WHITE)
+        screen.blit(restart_text, (WIDTH//2 - restart_text.get_width()//2, HEIGHT - 50))
+        pygame.display.flip()
+        pygame.time.delay(500)
+        
+        screen.blit(overlay, (0, 0))  # Refresh overlay
+        pygame.display.flip()
+        pygame.time.delay(500)
+    
+    # Final display of instructions
     restart_text = text_font.render("Press SPACE to restart or ESC to quit", True, WHITE)
     screen.blit(restart_text, (WIDTH//2 - restart_text.get_width()//2, HEIGHT - 50))
-    
     pygame.display.flip()
     
     # Wait for player input
@@ -322,121 +419,117 @@ def show_game_over_screen(screen, score, level, game_data):
 
 # Main game loop
 while running:
-    clock.tick(FPS)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    all_sprites.update()
-    for star in stars:
-        star.update()
-
-    # Bullet-enemy collision
-    hits = pygame.sprite.groupcollide(enemies, bullets, True, True)
-    for _ in hits:
-        score += 10
-        kills += 1
+    # Show start screen
+    if not show_start_screen(screen, game_data):
+        running = False
+        break
+    
+    # Reset game state
+    all_sprites = pygame.sprite.Group()
+    player = Player()
+    all_sprites.add(player)
+    bullets = pygame.sprite.Group()
+    enemies = pygame.sprite.Group()
+    powerups = pygame.sprite.Group()
+    enemy_bullets = pygame.sprite.Group()
+    score = 0
+    level = 1
+    kills = 0
+    start_time = time.time()
+    
+    # Spawn initial enemies
+    for _ in range(6):
         e = Enemy()
         all_sprites.add(e)
         enemies.add(e)
-        if random.random() < 0.2:
-            p = PowerUp()
-            all_sprites.add(p)
-            powerups.add(p)
+    
+    # Game loop
+    game_running = True
+    while game_running:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                game_running = False
 
-    # Player gets powerup
-    powerup_hits = pygame.sprite.spritecollide(player, powerups, True)
-    for hit in powerup_hits:
-        player.apply_powerup(hit.type)
-        game_data.update_stats(0, 0, hit.type)
+        all_sprites.update()
+        for star in stars:
+            star.update()
 
-    # Enemy bullet hits player
-    if pygame.sprite.spritecollide(player, enemy_bullets, True):
-        if not player.shield_active:
-            player.health -= 1
-            if player.health <= 0:
-                # Save game data
-                play_time = time.time() - start_time
-                game_data.update_stats(play_time, kills)
-                game_data.add_high_score(score, level)
-                
-                # Show game over screen
-                if not show_game_over_screen(screen, score, level, game_data):
-                    running = False
-                else:
-                    # Reset game state
-                    all_sprites = pygame.sprite.Group()
-                    player = Player()
-                    all_sprites.add(player)
-                    bullets = pygame.sprite.Group()
-                    enemies = pygame.sprite.Group()
-                    powerups = pygame.sprite.Group()
-                    enemy_bullets = pygame.sprite.Group()
-                    score = 0
-                    level = 1
-                    kills = 0
-                    start_time = time.time()
-                    
-                    # Spawn initial enemies
-                    for _ in range(6):
-                        e = Enemy()
-                        all_sprites.add(e)
-                        enemies.add(e)
-
-    # Enemy collision with player
-    if pygame.sprite.spritecollide(player, enemies, True):
-        if not player.shield_active:
-            player.health -= 1
-            if player.health <= 0:
-                # Save game data
-                play_time = time.time() - start_time
-                game_data.update_stats(play_time, kills)
-                game_data.add_high_score(score, level)
-                
-                # Show game over screen
-                if not show_game_over_screen(screen, score, level, game_data):
-                    running = False
-                else:
-                    # Reset game state
-                    all_sprites = pygame.sprite.Group()
-                    player = Player()
-                    all_sprites.add(player)
-                    bullets = pygame.sprite.Group()
-                    enemies = pygame.sprite.Group()
-                    powerups = pygame.sprite.Group()
-                    enemy_bullets = pygame.sprite.Group()
-                    score = 0
-                    level = 1
-                    kills = 0
-                    start_time = time.time()
-                    
-                    # Spawn initial enemies
-                    for _ in range(6):
-                        e = Enemy()
-                        all_sprites.add(e)
-                        enemies.add(e)
-
-    # Level up logic
-    if score > level * 100:
-        level += 1
-        player.shoot_power = min(player.shoot_power * 2, 8)
-        player.bullet_spread = 30
-        for _ in range(2):
+        # Bullet-enemy collision
+        hits = pygame.sprite.groupcollide(enemies, bullets, True, True)
+        for _ in hits:
+            score += 10
+            kills += 1
             e = Enemy()
             all_sprites.add(e)
             enemies.add(e)
+            if random.random() < 0.2:
+                p = PowerUp()
+                all_sprites.add(p)
+                powerups.add(p)
 
-    # Drawing
-    screen.blit(background_img, (0, 0))
-    for star in stars:
-        star.draw(screen)
-    all_sprites.draw(screen)
-    
-    # Display high scores
-    high_scores = game_data.get_high_scores()
-    high_score_text = f"High Score: {high_scores[0]['score'] if high_scores else 0}"
-    score_text = font.render(f"Score: {score}  Level: {level}  Health: {player.health}  {high_score_text}", True, WHITE)
-    screen.blit(score_text, (10, 10))
-    pygame.display.flip()
+        # Player gets powerup
+        powerup_hits = pygame.sprite.spritecollide(player, powerups, True)
+        for hit in powerup_hits:
+            player.apply_powerup(hit.type)
+            game_data.update_stats(0, 0, hit.type)
+
+        # Enemy bullet hits player
+        if pygame.sprite.spritecollide(player, enemy_bullets, True):
+            if not player.shield_active:
+                player.health -= 1
+                if player.health <= 0:
+                    # Save game data
+                    play_time = time.time() - start_time
+                    game_data.update_stats(play_time, kills)
+                    game_data.add_high_score(score, level)
+                    
+                    # Show game over screen
+                    if not show_game_over_screen(screen, score, level, game_data):
+                        running = False
+                        game_running = False
+                    else:
+                        game_running = False
+
+        # Enemy collision with player
+        if pygame.sprite.spritecollide(player, enemies, True):
+            if not player.shield_active:
+                player.health -= 1
+                if player.health <= 0:
+                    # Save game data
+                    play_time = time.time() - start_time
+                    game_data.update_stats(play_time, kills)
+                    game_data.add_high_score(score, level)
+                    
+                    # Show game over screen
+                    if not show_game_over_screen(screen, score, level, game_data):
+                        running = False
+                        game_running = False
+                    else:
+                        game_running = False
+
+        # Level up logic
+        if score > level * 100:
+            level += 1
+            player.shoot_power = min(player.shoot_power * 2, 8)
+            player.bullet_spread = 30
+            for _ in range(2):
+                e = Enemy()
+                all_sprites.add(e)
+                enemies.add(e)
+
+        # Drawing
+        screen.blit(background_img, (0, 0))
+        for star in stars:
+            star.draw(screen)
+        all_sprites.draw(screen)
+        
+        # Display high scores
+        high_scores = game_data.get_high_scores()
+        high_score_text = f"High Score: {high_scores[0]['score'] if high_scores else 0}"
+        score_text = font.render(f"Score: {score}  Level: {level}  Health: {player.health}  {high_score_text}", True, WHITE)
+        screen.blit(score_text, (10, 10))
+        pygame.display.flip()
 
 pygame.quit()
